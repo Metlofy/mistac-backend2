@@ -314,30 +314,36 @@ app.get('/api/keys/my', requireAuth, async (req, res) => {
 // ---- Client API (Scanner) ------------------------------------------------
 
 app.post('/api/scan', scanLimiter, requireClientSecret, async (req, res) => {
-  const { sessionCode, machineId, report } = req.body ?? {};
-  if (!machineId || !report) return res.status(400).json({ error: 'missing machineId or report body' });
+  // C# ScanReport gönderir: sessionCode, machineId, game, processes, prefetch... hepsi düz (flat) alanda
+  const body = req.body ?? {};
+  const { sessionCode, machineId } = body;
+
+  if (!machineId) return res.status(400).json({ error: 'missing machineId' });
   if (!sessionCode) return res.status(400).json({ error: 'missing sessionCode' });
+
   const session = await getSession(sessionCode);
   if (!isSessionUsable(session)) return res.status(403).json({ error: 'invalid or expired session code' });
 
   try {
     const rules = await getRules();
-    const detections = runDetections(report, rules.filter(r => r.enabled));
+    // Tüm body rapordur — sessionCode ayrıca session'dan zaten geliyor
+    const detections = runDetections(body, rules.filter(r => r.enabled));
     const finalPin = sessionCode;
     const finalReport = {
       pin: finalPin,
       machineId,
-      game: session.game || 'unknown',
+      game: session.game || body.game || 'unknown',
       createdAt: new Date().toISOString(),
-      scanDurationMs: report.scanDurationMs || 0,
-      submittedBy: session.createdBy || 'client',
-      ...report,
+      scanDurationMs: body.scanDurationMs || 0,
+      submittedBy: session.createdBy || body.submittedBy || 'client',
+      ...body,
       ...summarize(detections),
     };
     await saveScan(finalPin, finalReport);
     await markSessionUsed(sessionCode);
-    res.status(201).json({ ok: true, pin: finalPin });
+    res.status(201).json({ ok: true, pin: finalPin, verdict: finalReport.verdict ?? 'unknown' });
   } catch (err) {
+    console.error('Scan submit error:', err);
     res.status(500).json({ error: err.message });
   }
 });
