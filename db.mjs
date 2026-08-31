@@ -30,12 +30,12 @@ async function ensureFile(file, fallback) {
 async function init() {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await ensureFile(SCANS_FILE, {});
+  await ensureFile(RULES_FILE, []);   // Render'da data/ klasörü olmadığı için burada oluştur
   await ensureFile(AUDIT_FILE, []);
   await ensureFile(SESSIONS_FILE, {});
   await ensureFile(SETTINGS_FILE, {});
   await ensureFile(KEYS_FILE, {});
   await ensureFile(AUTH_SESSIONS_FILE, {});
-  // rules.json ships with example content already.
 }
 
 // --- tiny write queue so concurrent requests don't clobber the file ---
