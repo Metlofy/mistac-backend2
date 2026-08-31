@@ -326,8 +326,8 @@ app.post('/api/scan', scanLimiter, requireClientSecret, async (req, res) => {
 
   try {
     const rules = await getRules();
-    // Tüm body rapordur — sessionCode ayrıca session'dan zaten geliyor
     const detections = runDetections(body, rules.filter(r => r.enabled));
+    const verdict = summarize(detections); // string: 'clean', 'suspicious', 'cheating'
     const finalPin = sessionCode;
     const finalReport = {
       pin: finalPin,
@@ -337,11 +337,12 @@ app.post('/api/scan', scanLimiter, requireClientSecret, async (req, res) => {
       scanDurationMs: body.scanDurationMs || 0,
       submittedBy: session.createdBy || body.submittedBy || 'client',
       ...body,
-      ...summarize(detections),
+      detections,   // Detection nesneleri dizisi
+      verdict,      // 'clean' | 'suspicious' | 'cheating'
     };
     await saveScan(finalPin, finalReport);
     await markSessionUsed(sessionCode);
-    res.status(201).json({ ok: true, pin: finalPin, verdict: finalReport.verdict ?? 'unknown' });
+    res.status(201).json({ ok: true, pin: finalPin, verdict });
   } catch (err) {
     console.error('Scan submit error:', err);
     res.status(500).json({ error: err.message });
